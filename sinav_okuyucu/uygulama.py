@@ -76,7 +76,7 @@ with tab_okuma:
                         gorsel = Image.open(dosya)
                         b64_gorsel = image_to_base64(gorsel)
                         yanit = client.chat.completions.create(
-                            model="llama-3.2-90b-vision-instruct", # <-- RESMİ KALICI SÜRÜME GEÇİLDİ
+                            model="llama-3.2-90b-vision", # <-- RESMİ KALICI SÜRÜME GEÇİLDİ
                             messages=[{"role": "user", "content": [{"type": "text", "text": talimat}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_gorsel}"}}]}],
                             response_format={"type": "json_object"},
                             temperature=0.1,
