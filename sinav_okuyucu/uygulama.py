@@ -1,5 +1,6 @@
 import io
 import os
+import time
 import pandas as pd
 import streamlit as st
 from PIL import Image
@@ -63,7 +64,7 @@ with st.sidebar:
         "cevap anahtarındaki hedef kavramları **eş/yakın anlamlı** olarak arar "
         "ve **olumsuzluk (negasyon)** tuzaklarını eler."
     )
-    st.warning("⏱️ Ücretsiz yapay zeka sunucularındaki yoğunluğa göre 1 kağıdın okunması 10 ile 30 saniye arası sürebilir, lütfen çark dönerken bekleyin.")
+    st.warning("⏱️ Ücretsiz yapay zeka sunucularındaki yoğunluğa göre 1 kağıdın okunması zaman alabilir. Sistem 503 hatası alırsa sizin için otomatik olarak 3 kez tekrar deneyecektir.")
 
 st.title("📝 Çok Sorulu Açık Uçlu Sınav Okuma Sistemi")
 
@@ -142,39 +143,51 @@ with tab_okuma:
                 yeni_sonuclar = []
 
                 for i, dosya in enumerate(yuklenen_dosyalar):
-                    with st.spinner(f"Okunuyor ({i+1}/{len(yuklenen_dosyalar)}): {dosya.name}... (Lütfen 30 saniye kadar bekleyin)"):
-                        try:
-                            # TURBO SIKIŞTIRMA MODÜLÜ
-                            gorsel = Image.open(dosya)
-                            if gorsel.mode != 'RGB':
-                                gorsel = gorsel.convert('RGB')
-                            gorsel.thumbnail((800, 800)) # Boyutu daha da küçülttük
-                            
-                            tampon_gorsel = io.BytesIO()
-                            gorsel.save(tampon_gorsel, format="JPEG", quality=70) # Dosyayı minik bir JPEG'e çevirdik
-                            gorsel_bytes = tampon_gorsel.getvalue()
-                            
-                            gorsel_part = types.Part.from_bytes(data=gorsel_bytes, mime_type="image/jpeg")
+                    with st.spinner(f"Okunuyor ({i+1}/{len(yuklenen_dosyalar)}): {dosya.name}... (Yoğunluk varsa sistem otomatik bekleyip tekrar deneyecek)"):
+                        # OTOMATİK TEKRAR DENEME (RETRY) BLOĞU
+                        for deneme in range(3):
+                            try:
+                                gorsel = Image.open(dosya)
+                                if gorsel.mode != 'RGB':
+                                    gorsel = gorsel.convert('RGB')
+                                gorsel.thumbnail((800, 800)) 
+                                
+                                tampon_gorsel = io.BytesIO()
+                                gorsel.save(tampon_gorsel, format="JPEG", quality=70)
+                                gorsel_bytes = tampon_gorsel.getvalue()
+                                gorsel_part = types.Part.from_bytes(data=gorsel_bytes, mime_type="image/jpeg")
 
-                            yanit = client.models.generate_content(
-                                model="gemini-3.8-flash",
-                                contents=[sistem_talimati, gorsel_part],
-                                config=types.GenerateContentConfig(
-                                    response_mime_type="application/json",
-                                    response_schema=KagitSonucu,
-                                    temperature=0.1,
-                                ),
-                            )
-                            sonuc_obj = KagitSonucu.model_validate_json(yanit.text)
-                            yeni_sonuclar.append((dosya.name, sonuc_obj))
-                        except Exception as hata:
-                            st.error(f"{dosya.name} okunurken hata oluştu: {hata}")
+                                yanit = client.models.generate_content(
+                                    model="gemini-3.8-flash",
+                                    contents=[sistem_talimati, gorsel_part],
+                                    config=types.GenerateContentConfig(
+                                        response_mime_type="application/json",
+                                        response_schema=KagitSonucu,
+                                        temperature=0.1,
+                                    ),
+                                )
+                                sonuc_obj = KagitSonucu.model_validate_json(yanit.text)
+                                yeni_sonuclar.append((dosya.name, sonuc_obj))
+                                break # Başarılı olursa döngüden çık ve diğer kağıda geç
+                                
+                            except Exception as hata:
+                                hata_mesaji = str(hata)
+                                if "503" in hata_mesaji or "UNAVAILABLE" in hata_mesaji or "429" in hata_mesaji:
+                                    if deneme < 2: # 3. deneme değilse biraz bekle ve tekrar dene
+                                        st.toast(f"Sunucu yoğun, 5 saniye bekleniyor... (Deneme {deneme+1}/3)")
+                                        time.sleep(5)
+                                    else:
+                                        st.error(f"{dosya.name} okunamadı: Sunucular aşırı yoğun, lütfen daha sonra tekrar deneyin.")
+                                else:
+                                    st.error(f"{dosya.name} okunurken hata oluştu: {hata}")
+                                    break # 503 dışı bir hataysa tekrar deneme
 
                     ilerleme.progress((i + 1) / len(yuklenen_dosyalar))
 
                 st.session_state.sonuclar = yeni_sonuclar
-                st.success("Tüm kağıtların okuması tamamlandı! Detayları aşağıda veya 3. sekmede inceleyebilirsiniz.")
+                st.success("İşlem tamamlandı! Detayları aşağıda veya 3. sekmede inceleyebilirsiniz.")
 
+    # Okunan kağıtların şeffaf dökümü
     for dosya_adi, kagit in st.session_state.sonuclar:
         with st.expander(f"📄 {kagit.ogrenci_ad_soyad} (No: {kagit.ogrenci_no}) — Toplam: {kagit.toplam_puan} Puan", expanded=False):
             for s in kagit.sorular:
