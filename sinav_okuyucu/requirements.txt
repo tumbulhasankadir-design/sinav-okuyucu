@@ -1,6 +1,6 @@
-streamlit
-google-genai
-pillow
-pandas
-openpyxl
-pydantic
+streamlit>=1.38.0
+groq>=0.11.0
+pillow>=10.0.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+pydantic>=2.0.0
