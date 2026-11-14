@@ -143,15 +143,21 @@ with tab_okuma:
                 for i, dosya in enumerate(yuklenen_dosyalar):
                     with st.spinner(f"Okunuyor ({i+1}/{len(yuklenen_dosyalar)}): {dosya.name}..."):
                         try:
-                            ggorsel = Image.open(dosya)
-                            gorsel.thumbnail((1024, 1024))
-                            yanit = client.models.generate_content(
-                                model="gemini-3.8-flash",
-                                contents=[sistem_talimati, gorsel],
-                                config=types.GenerateContentConfig(
-                                    response_mime_type="application/json",
-                                    response_schema=KagitSonucu,
-                                    temperature=0.1,
+                        gorsel = Image.open(dosya)
+                        gorsel.thumbnail((1024, 1024))
+                        yanit = client.models.generate_content(
+                            model="gemini-3.8-flash",
+                            contents=[sistem_talimati, gorsel],
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
+                                response_schema=KagitSonucu,
+                                temperature=0.1,
+                            ),
+                        )
+                        sonuc_obj = KagitSonucu.model_validate_json(yanit.text)
+                        yeni_sonuclar.append((dosya.name, sonuc_obj))
+                    except Exception as hata:
+                        st.error(f"{dosya.name} okunurken hata oluştu: {hata}")
                                 ),
                             )
                             sonuc_obj = KagitSonucu.model_validate_json(yanit.text)
