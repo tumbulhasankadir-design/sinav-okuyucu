@@ -63,6 +63,7 @@ with st.sidebar:
         "cevap anahtarındaki hedef kavramları **eş/yakın anlamlı** olarak arar "
         "ve **olumsuzluk (negasyon)** tuzaklarını eler."
     )
+    st.warning("⏱️ Ücretsiz yapay zeka sunucularındaki yoğunluğa göre 1 kağıdın okunması 10 ile 30 saniye arası sürebilir, lütfen çark dönerken bekleyin.")
 
 st.title("📝 Çok Sorulu Açık Uçlu Sınav Okuma Sistemi")
 
@@ -141,13 +142,23 @@ with tab_okuma:
                 yeni_sonuclar = []
 
                 for i, dosya in enumerate(yuklenen_dosyalar):
-                    with st.spinner(f"Okunuyor ({i+1}/{len(yuklenen_dosyalar)}): {dosya.name}..."):
+                    with st.spinner(f"Okunuyor ({i+1}/{len(yuklenen_dosyalar)}): {dosya.name}... (Lütfen 30 saniye kadar bekleyin)"):
                         try:
+                            # TURBO SIKIŞTIRMA MODÜLÜ
                             gorsel = Image.open(dosya)
-                            gorsel.thumbnail((1024, 1024))
+                            if gorsel.mode != 'RGB':
+                                gorsel = gorsel.convert('RGB')
+                            gorsel.thumbnail((800, 800)) # Boyutu daha da küçülttük
+                            
+                            tampon_gorsel = io.BytesIO()
+                            gorsel.save(tampon_gorsel, format="JPEG", quality=70) # Dosyayı minik bir JPEG'e çevirdik
+                            gorsel_bytes = tampon_gorsel.getvalue()
+                            
+                            gorsel_part = types.Part.from_bytes(data=gorsel_bytes, mime_type="image/jpeg")
+
                             yanit = client.models.generate_content(
                                 model="gemini-3.8-flash",
-                                contents=[sistem_talimati, gorsel],
+                                contents=[sistem_talimati, gorsel_part],
                                 config=types.GenerateContentConfig(
                                     response_mime_type="application/json",
                                     response_schema=KagitSonucu,
@@ -164,7 +175,6 @@ with tab_okuma:
                 st.session_state.sonuclar = yeni_sonuclar
                 st.success("Tüm kağıtların okuması tamamlandı! Detayları aşağıda veya 3. sekmede inceleyebilirsiniz.")
 
-    # Okunan kağıtların şeffaf dökümü
     for dosya_adi, kagit in st.session_state.sonuclar:
         with st.expander(f"📄 {kagit.ogrenci_ad_soyad} (No: {kagit.ogrenci_no}) — Toplam: {kagit.toplam_puan} Puan", expanded=False):
             for s in kagit.sorular:
