@@ -158,12 +158,6 @@ with tab_okuma:
                         yeni_sonuclar.append((dosya.name, sonuc_obj))
                     except Exception as hata:
                         st.error(f"{dosya.name} okunurken hata oluştu: {hata}")
-                                ),
-                            )
-                            sonuc_obj = KagitSonucu.model_validate_json(yanit.text)
-                            yeni_sonuclar.append((dosya.name, sonuc_obj))
-                        except Exception as hata:
-                            st.error(f"{dosya.name} okunurken hata oluştu: {hata}")
 
                     ilerleme.progress((i + 1) / len(yuklenen_dosyalar))
 
