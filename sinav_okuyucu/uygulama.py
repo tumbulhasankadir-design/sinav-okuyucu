@@ -143,7 +143,8 @@ with tab_okuma:
                 for i, dosya in enumerate(yuklenen_dosyalar):
                     with st.spinner(f"Okunuyor ({i+1}/{len(yuklenen_dosyalar)}): {dosya.name}..."):
                         try:
-                            gorsel = Image.open(dosya)
+                            ggorsel = Image.open(dosya)
+                            gorsel.thumbnail((1024, 1024))
                             yanit = client.models.generate_content(
                                 model="gemini-3.8-flash",
                                 contents=[sistem_talimati, gorsel],
